@@ -26,15 +26,33 @@ server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
 server_socket.bind((IP, PORT))
 server_socket.listen()
+
 cursor.execute("SELECT server FROM load_balance")
 res = cursor.fetchall()
 conn.commit()
-if not [str(IP), str(PORT)] in res:
+
+found = False
+for S in res:
+    if [str(IP), str(PORT)] == S[0]:
+        found = True
+        break
+
+if not found:
     cursor.execute(
         "INSERT INTO load_balance(server, clients) VALUES(%s,%s)",
         (
             [str(IP), str(PORT)],
             [],
+        ),
+    )
+    conn.commit()
+
+else:
+    cursor.execute(
+        "UPDATE load_balance SET clients=%s WHERE server=%s",
+        (
+            [],
+            [str(IP), str(PORT)],
         ),
     )
     conn.commit()
@@ -253,7 +271,7 @@ def AcceptingSocket(HEADERLENGTH):
                                 != pickle.loads(user["data"])[1]
                             ):
                                 sel = "SERVER"
-                                sel_he = bytes(f"{len(serv) :<{HEADERLENGTH}}", "utf-8")
+                                sel_he = bytes(f"{len(sel) :<{HEADERLENGTH}}", "utf-8")
                                 ms = (
                                     ms
                                     + "   "
@@ -274,9 +292,11 @@ def AcceptingSocket(HEADERLENGTH):
 
                         serv = "SERVER"
                         serv_he = bytes(f"{len(serv) :<{HEADERLENGTH}}", "utf-8")
+                        ms = (ms, "auth-data")
+                        ms = pickle.dumps(ms)
                         ms_he = bytes(f"{len(ms) :<{HEADERLENGTH}}", "utf-8")
                         notified_socket.send(
-                            serv_he + serv.encode("utf-8") + ms_he + ms.encode("utf-8")
+                            serv_he + serv.encode("utf-8") + ms_he + ms
                         )
 
                 elif message_to == "PPUBLIC-KEY":
@@ -323,6 +343,9 @@ def AcceptingSocket(HEADERLENGTH):
                     message_to != "GROUP"
                     and message_to != "GROUP_MESSAGE"
                     and message_to != "gManipl"
+                    and message_to != "apowadd"
+                    and message_to != "apowrem"
+                    and message_to != "UNREAD-MSSG"
                 ):
                     print(
                         f"Received message from {pickle.loads(user['data'])[1]} to {message_to}"
@@ -333,6 +356,7 @@ def AcceptingSocket(HEADERLENGTH):
                     )
                     To = cursor.fetchall()
                     conn.commit()
+                    print(To[0][2])
                     if To[0][2] == "offline":
                         cursor.execute(
                             """INSERT INTO unreadMessages(from_person, to_person, type_of_message, Message, PostedAt)
@@ -341,7 +365,7 @@ def AcceptingSocket(HEADERLENGTH):
                                 pickle.loads(user["data"])[1],
                                 message_to,
                                 message_con[0],
-                                encrypt("password", message_con[1]),
+                                pickle.dumps(message_con[1]),
                                 datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
                             ),
                         )
@@ -418,11 +442,13 @@ def AcceptingSocket(HEADERLENGTH):
                     if len(res) != 0:
                         # print("A group with this name already exists")
                         ms = "A group with this name already exists"
+                        ms = (ms, "auth-data")
+                        ms = pickle.dumps(ms)
                         serv = "SERVER"
                         serv_he = bytes(f"{len(serv) :<{HEADERLENGTH}}", "utf-8")
                         ms_he = bytes(f"{len(ms) :<{HEADERLENGTH}}", "utf-8")
                         notified_socket.send(
-                            serv_he + serv.encode("utf-8") + ms_he + ms.encode("utf-8")
+                            serv_he + serv.encode("utf-8") + ms_he + ms
                         )
                         continue
                     cursor.execute(
@@ -445,14 +471,13 @@ def AcceptingSocket(HEADERLENGTH):
                         conn.commit()
                         if len(res1) == 0:
                             ms = f"Participant with name {par_name} not exists"
+                            ms = (ms, "auth-data")
+                            ms = pickle.dumps(ms)
                             serv = "SERVER"
                             serv_he = bytes(f"{len(serv) :<{HEADERLENGTH}}", "utf-8")
                             ms_he = bytes(f"{len(ms) :<{HEADERLENGTH}}", "utf-8")
                             notified_socket.send(
-                                serv_he
-                                + serv.encode("utf-8")
-                                + ms_he
-                                + ms.encode("utf-8")
+                                serv_he + serv.encode("utf-8") + ms_he + ms
                             )
                             continue
                         cursor.execute(
@@ -468,16 +493,15 @@ def AcceptingSocket(HEADERLENGTH):
                             if i == par_name:
                                 check = 1
                                 ms = f"Participant with name {par_name} already exits in group"
+                                ms = (ms, "auth-data")
+                                ms = pickle.dumps(ms)
                                 serv = "SERVER"
                                 serv_he = bytes(
                                     f"{len(serv) :<{HEADERLENGTH}}", "utf-8"
                                 )
                                 ms_he = bytes(f"{len(ms) :<{HEADERLENGTH}}", "utf-8")
                                 notified_socket.send(
-                                    serv_he
-                                    + serv.encode("utf-8")
-                                    + ms_he
-                                    + ms.encode("utf-8")
+                                    serv_he + serv.encode("utf-8") + ms_he + ms
                                 )
                         if check:
                             continue
@@ -500,6 +524,8 @@ def AcceptingSocket(HEADERLENGTH):
                                 != message_con["Admin"]
                             ):
                                 stri = f"you were added to the group {message_con['GROUP_NAME']} by {message_con['Admin']}"
+                                stri = (stri, "auth-data")
+                                stri = pickle.dumps(stri)
                                 serv = "SERVER"
                                 serv_he = bytes(
                                     f"{len(serv) :<{HEADERLENGTH}}", "utf-8"
@@ -508,7 +534,7 @@ def AcceptingSocket(HEADERLENGTH):
                                     serv_he
                                     + serv.encode("utf-8")
                                     + message["header"]
-                                    + stri.encode("utf-8")
+                                    + stri
                                 )
 
                 elif message_to == "gManipl":
@@ -520,30 +546,34 @@ def AcceptingSocket(HEADERLENGTH):
                     conn.commit()
                     if len(res) == 0:
                         ms = "Group with this name doesnot exists"
+                        ms = (ms, "auth-data")
+                        ms = pickle.dumps(ms)
                         serv = "SERVER"
                         serv_he = bytes(f"{len(serv) :<{HEADERLENGTH}}", "utf-8")
                         ms_he = bytes(f"{len(ms) :<{HEADERLENGTH}}", "utf-8")
                         notified_socket.send(
-                            serv_he + serv.encode("utf-8") + ms_he + ms.encode("utf-8")
+                            serv_he + serv.encode("utf-8") + ms_he + ms
                         )
                         a = "10"
                     elif res[0][1] != pickle.loads(user["data"])[1]:
                         ms = "Only admin can add partipants"
+                        ms = (ms, "auth-data")
+                        ms = pickle.dumps(ms)
                         serv = "SERVER"
                         serv_he = bytes(f"{len(serv) :<{HEADERLENGTH}}", "utf-8")
                         ms_he = bytes(f"{len(ms) :<{HEADERLENGTH}}", "utf-8")
                         notified_socket.send(
-                            serv_he + serv.encode("utf-8") + ms_he + ms.encode("utf-8")
+                            serv_he + serv.encode("utf-8") + ms_he + ms
                         )
                         a = "10"
                     else:
                         a = "11"
+                    a = (a, "adm-data")
+                    a = pickle.dumps(a)
                     a_he = bytes(f"{len(a) :<{HEADERLENGTH}}", "utf-8")
                     serv = "SERVER"
                     serv_he = bytes(f"{len(serv) :<{HEADERLENGTH}}", "utf-8")
-                    notified_socket.send(
-                        serv_he + serv.encode("utf-8") + a_he + a.encode("utf-8")
-                    )
+                    notified_socket.send(serv_he + serv.encode("utf-8") + a_he + a)
 
                 elif message_to == "apowadd":
                     # part_nam = message_con[0]
@@ -557,11 +587,13 @@ def AcceptingSocket(HEADERLENGTH):
                     if len(res1) == 0:
                         print(f"Participant with name {message_con[0]} not exists")
                         ms = "Participant with that name not exists"
+                        ms = (ms, "auth-data")
+                        ms = pickle.dumps(ms)
                         serv = "SERVER"
                         serv_he = bytes(f"{len(serv) :<{HEADERLENGTH}}", "utf-8")
                         ms_he = bytes(f"{len(ms) :<{HEADERLENGTH}}", "utf-8")
                         notified_socket.send(
-                            serv_he + serv.encode("utf-8") + ms_he + ms.encode("utf-8")
+                            serv_he + serv.encode("utf-8") + ms_he + ms
                         )
                         check1 = 0
                     cursor.execute(
@@ -572,24 +604,24 @@ def AcceptingSocket(HEADERLENGTH):
                     conn.commit()
                     if len(res) == 0:
                         ms = f"Group with name {message_con[1]} doesnot exists"
+                        ms = (ms, "auth-data")
+                        ms = pickle.dumps(ms)
                         serv = "SERVER"
                         serv_he = bytes(f"{len(serv) :<{HEADERLENGTH}}", "utf-8")
                         ms_he = bytes(f"{len(ms) :<{HEADERLENGTH}}", "utf-8")
                         notified_socket.send(
-                            serv_he + serv.encode("utf-8") + ms_he + ms.encode("utf-8")
+                            serv_he + serv.encode("utf-8") + ms_he + ms
                         )
-                        check1 = 0
                     for i in res[0][2]:
                         if i == message_con[0]:
                             ms = f"Participant with name {message_con[0]} already exits in group"
+                            ms = (ms, "auth-data")
+                            ms = pickle.dumps(ms)
                             serv = "SERVER"
                             serv_he = bytes(f"{len(serv) :<{HEADERLENGTH}}", "utf-8")
                             ms_he = bytes(f"{len(ms) :<{HEADERLENGTH}}", "utf-8")
                             notified_socket.send(
-                                serv_he
-                                + serv.encode("utf-8")
-                                + ms_he
-                                + ms.encode("utf-8")
+                                serv_he + serv.encode("utf-8") + ms_he + ms
                             )
                             check1 = 0
                     if check1 == 1:
@@ -613,11 +645,13 @@ def AcceptingSocket(HEADERLENGTH):
                     if len(res2) == 0:
                         print(f"Participant with name {message_con[0]} not exists")
                         ms = "Participant with that name not exists"
+                        ms = (ms, "auth-data")
+                        ms = pickle.dumps(ms)
                         serv = "SERVER"
                         serv_he = bytes(f"{len(serv) :<{HEADERLENGTH}}", "utf-8")
                         ms_he = bytes(f"{len(ms) :<{HEADERLENGTH}}", "utf-8")
                         notified_socket.send(
-                            serv_he + serv.encode("utf-8") + ms_he + ms.encode("utf-8")
+                            serv_he + serv.encode("utf-8") + ms_he + ms
                         )
                     cursor.execute(
                         "SELECT * FROM groups_info WHERE group_name =%s",
@@ -627,11 +661,13 @@ def AcceptingSocket(HEADERLENGTH):
                     conn.commit()
                     if len(res) == 0:
                         ms = f"Group with name {message_con[1]} doesnot exists"
+                        ms = (ms, "auth-data")
+                        ms = pickle.dumps(ms)
                         serv = "SERVER"
                         serv_he = bytes(f"{len(serv) :<{HEADERLENGTH}}", "utf-8")
                         ms_he = bytes(f"{len(ms) :<{HEADERLENGTH}}", "utf-8")
                         notified_socket.send(
-                            serv_he + serv.encode("utf-8") + ms_he + ms.encode("utf-8")
+                            serv_he + serv.encode("utf-8") + ms_he + ms
                         )
                     for i in res[0][2]:
                         if i == message_con[0]:
@@ -655,36 +691,117 @@ def AcceptingSocket(HEADERLENGTH):
                     conn.commit()
                     if len(res) == 0:
                         ms = f"Group with name {message_con[1]} doesnot exists"
+                        ms = (ms, "auth-data")
+                        ms = pickle.dumps(ms)
                         serv = "SERVER"
                         serv_he = bytes(f"{len(serv) :<{HEADERLENGTH}}", "utf-8")
                         ms_he = bytes(f"{len(ms) :<{HEADERLENGTH}}", "utf-8")
                         notified_socket.send(
-                            serv_he + serv.encode("utf-8") + ms_he + ms.encode("utf-8")
+                            serv_he + serv.encode("utf-8") + ms_he + ms
                         )
                     group = res[0][2]
                     if pickle.loads(user["data"])[1] in group:
                         print(
                             f"Received message from {pickle.loads(user['data'])[1]} to group {message_gpn}"
                         )
+                        G = []
+                        for g in group:
+                            G.append(g)
+                        for client_socket in clients:
+                            if pickle.loads(clients[client_socket]["data"])[1] in G:
+                                G.remove(
+                                    pickle.loads(clients[client_socket]["data"])[1]
+                                )
+                        for other_server_user in G:
+                            cursor.execute(
+                                "SELECT status FROM user_info WHERE username= %s",
+                                (other_server_user),
+                            )
+                            Status = cursor.fetchall()
+                            conn.commit()
+                            print(Status, other_server_user)
+                            if Status[0][0] == "offline":
+                                if message_is[1][1][0] == "text":
+                                    cursor.execute(
+                                        """INSERT INTO unreadMessages(from_person, to_person, type_of_message, Message, PostedAt)
+                                                VALUES(%s,%s,%s,%s,%s)""",
+                                        (
+                                            pickle.loads(user["data"])[1],
+                                            other_server_user,
+                                            message_is[1][1][0],
+                                            pickle.dumps(message_is[1][1][1]),
+                                            datetime.now().strftime(
+                                                "%d/%m/%Y %H:%M:%S"
+                                            ),
+                                        ),
+                                    )
+                                    conn.commit()
+                            else:
+                                user_Header = bytes(
+                                    f"{len(pickle.loads(user['data'])[1]) :<{HEADERLENGTH}}",
+                                    "utf-8",
+                                )
+                                for i in message_is:
+                                    if other_server_user == i[0]:
+                                        print(pickle.loads(user["data"])[1], i[1])
+                                        master_socket.send(
+                                            user_Header
+                                            + pickle.loads(user["data"])[1].encode(
+                                                "utf-8"
+                                            )
+                                            + message["header"]
+                                            + pickle.dumps((i[1], other_server_user))
+                                        )
+
                         for client_socket in clients:
                             if pickle.loads(clients[client_socket]["data"])[1] in group:
                                 for i in message_is:
                                     if (
                                         pickle.loads(clients[client_socket]["data"])[1]
                                         == i[0]
-                                    ):  # pickle.loads(user["data"])[1].encode("utf-8"):
-                                        se = bytes(
-                                            f"{len(pickle.loads(user['data'])[1]) :<{HEADERLENGTH}}",
-                                            "utf-8",
+                                    ):
+                                        cursor.execute(
+                                            "SELECT status FROM user_info WHERE username= %s",
+                                            (
+                                                pickle.loads(
+                                                    clients[client_socket]["data"]
+                                                )[1],
+                                            ),
                                         )
-                                        client_socket.send(
-                                            se
-                                            + pickle.loads(user["data"])[1].encode(
-                                                "utf-8"
+                                        Res = cursor.fetchall()
+                                        conn.commit()
+                                        print(Res)
+                                        # pickle.loads(user["data"])[1].encode("utf-8"):
+                                        if Res[0][0] == "offline":
+                                            cursor.execute(
+                                                """INSERT INTO unreadMessages(from_person, to_person, type_of_message, Message, PostedAt)
+                                                        VALUES(%s,%s,%s,%s,%s)""",
+                                                (
+                                                    pickle.loads(user["data"])[1],
+                                                    pickle.loads(
+                                                        clients[client_socket]["data"]
+                                                    )[1],
+                                                    message_is[1][1][0],
+                                                    pickle.dumps(message_con[1][1][1]),
+                                                    datetime.now().strftime(
+                                                        "%d/%m/%Y %H:%M:%S"
+                                                    ),
+                                                ),
                                             )
-                                            + message["header"]
-                                            + pickle.dumps(i[1])
-                                        )
+                                            conn.commit()
+                                        else:
+                                            se = bytes(
+                                                f"{len(pickle.loads(user['data'])[1]) :<{HEADERLENGTH}}",
+                                                "utf-8",
+                                            )
+                                            client_socket.send(
+                                                se
+                                                + pickle.loads(user["data"])[1].encode(
+                                                    "utf-8"
+                                                )
+                                                + message["header"]
+                                                + pickle.dumps(i[1])
+                                            )
                     else:
                         sff = "you are not in this group :)"
                         se = bytes(
@@ -697,6 +814,33 @@ def AcceptingSocket(HEADERLENGTH):
                             + message["header"]
                             + sff.encode("utf-8")
                         )
+
+                elif message_to == "UNREAD-MSSG":
+                    user = pickle.loads(user["data"])[1]
+                    cursor.execute(
+                        "SELECT * FROM unreadmessages WHERE to_person =%s", (username,)
+                    )
+                    udat = cursor.fetchall()
+                    conn.commit()
+                    for i in udat:
+                        sby = i[0]
+                        smt = i[2]
+                        sme = pickle.loads(i[3])
+                        message = (smt, sme)
+                        message = pickle.dumps(message)
+                        message_he = bytes(
+                            f"{len(message)+1 :<{HEADERLENGTH}}", "utf-8"
+                        )
+                        client_socket.send(
+                            bytes(f"{len(sby) :<{HEADERLENGTH}}", "utf-8")
+                            + sby.encode("utf-8")
+                            + message_he
+                            + message
+                        )
+                    cursor.execute(
+                        "DELETE FROM unreadmessages WHERE to_person =%s", (username,)
+                    )
+                    conn.commit()
 
         for notified_socket in exception_sockets:
             sockets_list.remove(notified_socket)
@@ -725,12 +869,10 @@ def receiving(HEADERLENGTH):
 
                 for client_socket in clients:
                     if pickle.loads(clients[client_socket]["data"])[1] == message_to:
-                        found = True
                         se = bytes(
                             f"{len(User_From_from) :<{HEADERLENGTH}}",
                             "utf-8",
                         )
-                        
                         if message_con[0] == "text":
                             client_socket.send(
                                 se

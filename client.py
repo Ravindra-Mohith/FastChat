@@ -122,17 +122,11 @@ def sending(HEADER_LENGTH):
             + "  2-CREATE A GROUP\n"
             + "  3-ENTER A GROUP CHAT\n"
             + "  4-PRINT LIST OF CHATS\n"
+            + "  5-SEE UNREAD MESSAGES\n"
         )
         input_command = input()
 
-        if input_command == "4":
-            li = ("list of chats", "SERVER")
-            li = pickle.dumps(li)
-            he = bytes(f"{len(li) :<{HEADER_LENGTH}}", "utf-8")
-            client_socket.send(he + li)
-            continue
-
-        elif input_command == "1":
+        if input_command == "1":
             f_uname = input("Username you want to send message or @#@EXIT@#@ to exit:")
             if f_uname == "@#@EXIT@#@":
                 continue
@@ -344,6 +338,28 @@ def sending(HEADER_LENGTH):
                     elif wtd == "0":
                         break
 
+                    else:
+                        print("Wrong input :(")
+                        continue
+
+        elif input_command == "4":
+            li = ("list of chats", "SERVER")
+            li = pickle.dumps(li)
+            he = bytes(f"{len(li) :<{HEADER_LENGTH}}", "utf-8")
+            client_socket.send(he + li)
+            continue
+
+        elif input_command == "5":
+            mess = ("unread messages", "UNREAD-MSSG")
+            mess = pickle.dumps(mess)
+            mess_he = bytes(f"{len(mess) :<{HEADER_LENGTH}}", "utf-8")
+            client_socket.send(mess_he + mess)
+            time.sleep(0.01)
+
+        else:
+            print("Wrong input :(")
+            continue
+
 
 def receiving(HEADER_LENGTH):
     global currvalup
@@ -376,22 +392,32 @@ def receiving(HEADER_LENGTH):
                         print(tbp)
                     elif message[0] == "image":
                         print("image received from " + username_2)
-                        name = f"image1"
-                        file = open(f"{name}.png", "wb")
+                        # name = f"image1"
+                        # name = (
+                        #     str(datetime.datetime.now()).split(" ")[0]
+                        #     + "_"
+                        #     + str(datetime.datetime.now()).split(" ")[1]
+                        # )
+                        name = f"image_from_{username_2}"
+                        file = open(name + ".jpg", "wb")
                         img_data = pickle.loads(message[1])
                         enm = img_data[0]
                         enm = (rsa.decrypt(enm, m_key)).decode("utf-8")
                         imag = decrypt(enm, img_data[1])
                         file.write(imag)
-                        img = cv2.imread(f"{name}.png", cv2.IMREAD_ANYCOLOR)
-                        cv2.imshow(f"Image from {username_2}", img)
-                        cv2.waitKey(0)
-
+                        # img = cv2.imread(f"{name}.png", cv2.IMREAD_ANYCOLOR)
+                        # cv2.imshow(f"Image from {username_2}", img)
+                        # cv2.waitKey(0)
                 else:
                     message = pickle.loads(client_socket.recv(message_length))
                     if message[1] == "auth-data":
                         tbp = colors_256(message[0], username_2, True)
-                        print(tbp)
+                        if tbp == "Incorrect username or password":
+                            print(tbp)
+                            sys.exit(1)
+                        else:
+                            print(tbp)
+
                     elif message[1] == "key-data":
                         f_key = message[0]
                     elif message[1] == "adm-data":

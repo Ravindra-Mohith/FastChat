@@ -1,6 +1,5 @@
 import socket
-import pickle
-import psycopg2, threading, sys, select
+import psycopg2, pickle, select
 
 HEADERSIZE = 10
 HEADER_LENGTH = 10
@@ -13,7 +12,6 @@ conn = psycopg2.connect(
     port="5432",
 )
 cursor = conn.cursor()
-
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server_socket.bind((socket.gethostname(), 9999))
 server_socket.listen()
@@ -64,8 +62,16 @@ while True:
 
             if message_recieved is False:
                 print(
-                    f"Closed connection from {clients[socket]['data'].decode('utf-8')}"
+                    f"Closed connection from server with ip, port : {clients[socket]['data'].decode('utf-8')}"
                 )
+                cursor.execute(
+                    "DELETE FROM load_balance WHERE server=ARRAY[%s,%s]",
+                    (
+                        str(clients[socket]["data"].decode("utf-8").split(", ")[0]),
+                        str(clients[socket]["data"].decode("utf-8").split(", ")[1]),
+                    ),
+                )
+                conn.commit()
                 sockets_list.remove(socket)
                 del clients[socket]
                 continue
@@ -76,9 +82,32 @@ while True:
             )
 
             message = recieveMessage(socket)
+            TO = pickle.loads(message["data"])[1]
+            SERVERS = []
+            for i in clients.values():
+                SERVERS.append(
+                    (
+                        i["data"].decode("utf-8").split(", ")[0],
+                        i["data"].decode("utf-8").split(", ")[1],
+                    )
+                )
+            print(SERVERS)
 
+            cursor.execute("SELECT * FROM load_balance")
+            res = cursor.fetchall()
+            conn.commit()
+            Ser = []
+            if Ser == []:
+                continue
+            for row in res:
+                for client in row[1]:
+                    if client == TO:
+                        Ser = row[0]
+                        break
+            print(Ser)
+            Ser = Ser[0] + ", " + Ser[1]
             for client_socket in clients:
-                if client_socket != socket:
+                if clients[client_socket]["data"].decode("utf-8") == Ser:
                     client_socket.send(
                         message_recieved["header"]
                         + message_recieved["data"]
