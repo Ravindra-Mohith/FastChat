@@ -44,6 +44,17 @@ currvalup = "00"
 
 
 def colors_256(stri, id, dat):
+    """Adds colour to the chat displayed on the terminal
+
+    :param stri: A string to be coloured(message)
+    :type stri: string
+    :param id: username used for hashing
+    :type id: string
+    :param dat: boolean variable to differentiate between messages from other clients and that from server
+    :type dat: bool
+    :return: coloured string is written
+    :rtype: string
+    """
     if not dat:
         num1 = str(hash(id) % 100)
     else:
@@ -52,6 +63,15 @@ def colors_256(stri, id, dat):
 
 
 def grp(grp_name, listofpart):
+    """Creates a group for a set of clients with the creator as admin
+
+    :param grp_name: name of the group
+    :type grp_name: string
+    :param listofpart: members of the group other than admin
+    :type listofpart: list
+    :return: dictinary of group name, admin and pariticipants
+    :rtype: dictionary
+    """
     global username
     Name = {}
     Name["GROUP_NAME"] = grp_name
@@ -62,6 +82,9 @@ def grp(grp_name, listofpart):
 
 
 def auth():
+    """Login/Signup page for the client. It allows the new user to create a account and existing user to login.
+    
+    """
     global username
     global m_key
     todo = input("Type LOGIN to login or SIGNUP to register: ")
@@ -112,6 +135,11 @@ time.sleep(0.01)
 
 
 def sending(HEADER_LENGTH):
+    """Sends encrypted mesages and also the person/group to whom the message to be sent to the server. It also sends quieries to the server. It sends the receiver detail and the message tuple dumped using pickle.
+
+    :param HEADER_LENGTH: a constant
+    :type HEADER_LENGTH: int
+    """
     global currvalup
     global f_key
     global gf_key
@@ -362,6 +390,11 @@ def sending(HEADER_LENGTH):
 
 
 def receiving(HEADER_LENGTH):
+    """Receives encrypted messages from the server, decrypts it using the private key stored int the .pem file. And also displays it on the terminal. It also allows the client to receive and view the images.
+
+    :param HEADER_LENGTH: a constant
+    :type HEADER_LENGTH: int
+    """
     global currvalup
     global username
     global f_key

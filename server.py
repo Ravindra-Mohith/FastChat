@@ -80,6 +80,13 @@ conn.commit()
 
 
 def receive_message(client_socket):
+    """This function recieves messages from clients
+    
+    :param client_socket: socket of a client that is connected to server
+    :type client_socket: socket
+    :return: message from the client
+    :rtype: dictionary
+    """
     try:
         message_header = client_socket.recv(HEADERLENGTH)
 
@@ -94,6 +101,11 @@ def receive_message(client_socket):
 
 
 def AcceptingSocket(HEADERLENGTH):
+    """This function allows the user to login or signup. And it also sends messages to the clients. It also creates groups, adds participnts and remove participants. it does the respective work accroding to the query recieved from client. 
+    
+    :param HEADERLENGTH: a constant
+    :type HEADERLENGTH: int
+    """
     while True:
         read_sockets, not_req, exception_sockets = select.select(
             sockets_list, [], sockets_list
@@ -848,6 +860,11 @@ def AcceptingSocket(HEADERLENGTH):
 
 
 def receiving(HEADERLENGTH):
+    """This function recieves messages from client
+    
+    :param HEADERLENGTH: a constant
+    :type HEADERLENGTH: int
+    """
     while True:
         try:
             while True:

@@ -20,6 +20,13 @@ clients = {}
 
 
 def recieveMessage(client_socket):
+    """This function recieves messages from servers
+    
+    :param client_socket: socket of a server that is connected to master_server
+    :type client_socket: socket
+    :return: message from the server
+    :rtype: dictionary
+    """
     try:
         message_header = client_socket.recv(HEADER_LENGTH)
         # if message_header is null
