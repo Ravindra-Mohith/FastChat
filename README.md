@@ -25,8 +25,7 @@ Our FastChat allow users to send and receive messages and images to other users.
 - Socket Library 
 - Threading
 - Bcrypt Library
-- tkinter
-- cv2
+- pickle
 
 ## Running
 
