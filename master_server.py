@@ -104,13 +104,13 @@ while True:
             res = cursor.fetchall()
             conn.commit()
             Ser = []
-            if Ser == []:
-                continue
             for row in res:
                 for client in row[1]:
                     if client == TO:
                         Ser = row[0]
                         break
+            if Ser == []:
+                continue
             print(Ser)
             Ser = Ser[0] + ", " + Ser[1]
             for client_socket in clients:
