@@ -727,7 +727,7 @@ def AcceptingSocket(HEADERLENGTH):
                         for other_server_user in G:
                             cursor.execute(
                                 "SELECT status FROM user_info WHERE username= %s",
-                                (other_server_user),
+                                (other_server_user,),
                             )
                             Status = cursor.fetchall()
                             conn.commit()
